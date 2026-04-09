@@ -1,0 +1,56 @@
+﻿{% extends "layout.html" %}
+{% block content %}
+<section class="admin-header">
+  <h2>Admin Dashboard</h2>
+  <div class="admin-actions">
+    <form method="POST" action="/admin/train">
+      <button class="secondary-btn" type="submit">Retrain Model</button>
+    </form>
+    <a class="secondary-btn" href="/admin/logout">Logout</a>
+  </div>
+</section>
+
+<section class="admin-grid">
+  <div class="form-card">
+    <h3>Add New Q&A</h3>
+    <form method="POST" action="/admin/add">
+      <label>Question</label>
+      <input type="text" name="question" required />
+      <label>Answer</label>
+      <textarea name="answer" rows="3" required></textarea>
+      <label>Intent</label>
+      <input list="intent-list" name="intent" required />
+      <datalist id="intent-list">
+        {% for i in intents %}<option value="{{ i }}"></option>{% endfor %}
+      </datalist>
+      <button class="primary-btn" type="submit">Add</button>
+    </form>
+  </div>
+
+  <div class="table-card">
+    <h3>Knowledge Base</h3>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Question</th>
+            <th>Answer</th>
+            <th>Intent</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in qa_rows %}
+            <tr>
+              <td>{{ row[0] }}</td>
+              <td>{{ row[1] }}</td>
+              <td>{{ row[2] }}</td>
+              <td>{{ row[3] }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,8 @@
+﻿Flask==3.0.2
+mysql-connector-python==8.4.0
+scikit-learn==1.4.2
+pandas==2.2.2
+numpy==1.26.4
+joblib==1.4.0
+nltk==3.8.1
+pypdf==4.2.0

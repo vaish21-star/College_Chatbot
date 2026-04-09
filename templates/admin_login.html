@@ -1,0 +1,14 @@
+﻿{% extends "layout.html" %}
+{% block content %}
+<section class="admin-login">
+  <h2>Admin Login</h2>
+  <form method="POST" class="form-card">
+    <label>Username</label>
+    <input type="text" name="username" required />
+    <label>Password</label>
+    <input type="password" name="password" required />
+    <button type="submit" class="primary-btn">Login</button>
+  </form>
+  <p class="muted">Default admin: admin / admin123 (change after first login)</p>
+</section>
+{% endblock %}
