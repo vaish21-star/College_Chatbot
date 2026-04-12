@@ -10,6 +10,41 @@
   </div>
 </section>
 
+<section class="intent-section">
+  <div class="section-head">
+    <h2>Intent Distribution</h2>
+    <p>Top intents detected from user queries (auto-calculated from chat logs).</p>
+  </div>
+  <div class="intent-card">
+    {% for item in intent_dist %}
+    <div class="intent-row">
+      <div class="intent-label">{{ item.label }}</div>
+      <div class="intent-bar"><span style="width: {{ item.pct }}%"></span></div>
+      <div class="intent-value">{{ item.pct }}%</div>
+    </div>
+    {% endfor %}
+    <div class="intent-note">Last updated: {{ intent_last_updated }}</div>
+  </div>
+</section>
+
+<section class="trend-section">
+  <div class="section-head">
+    <h2>Intent Trend (Last 7 Days)</h2>
+    <p>Daily volume of intent-classified queries to show system activity.</p>
+  </div>
+  <div class="trend-card">
+    <div class="trend-bars">
+      {% for day in intent_trend %}
+      <div class="trend-bar">
+        <span style="height: {{ day.pct }}%"></span>
+        <div class="trend-label">{{ day.label }}</div>
+        <div class="trend-value">{{ day.value }}</div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
 <section class="admin-grid">
   <div class="form-card">
     <h3>Add New Q&A</h3>

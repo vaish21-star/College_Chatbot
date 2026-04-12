@@ -1,0 +1,24 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="admin-login">
+  <div class="form-card">
+    <h2>Student Profile</h2>
+    <div class="profile-row">
+      <span class="profile-label">Name</span>
+      <span class="profile-value">{{ profile.name }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="profile-label">Roll Number</span>
+      <span class="profile-value">{{ profile.roll }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="profile-label">Email</span>
+      <span class="profile-value">{{ profile.email }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="profile-label">Verified At</span>
+      <span class="profile-value">{{ profile.verified_at }}</span>
+    </div>
+  </div>
+</section>
+{% endblock %}

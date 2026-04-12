@@ -1,0 +1,21 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="admin-login">
+  <div class="form-card">
+    <h2>Student Signup</h2>
+    <p class="muted">OTP verification is required only for first-time registration.</p>
+    <form method="POST" action="/student/signup">
+      <label>Name</label>
+      <input type="text" name="name" required />
+      <label>Roll Number</label>
+      <input type="text" name="roll" required />
+      <label>Email</label>
+      <input type="email" name="email" required />
+      <label>Password</label>
+      <input type="password" name="password" required />
+      <button class="primary-btn" type="submit">Send OTP</button>
+    </form>
+    <div class="muted">Already registered? <a href="/student/login">Login</a></div>
+  </div>
+</section>
+{% endblock %}

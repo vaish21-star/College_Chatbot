@@ -2,6 +2,9 @@
 import random
 import json
 import re
+from datetime import datetime, timedelta
+import smtplib
+from email.message import EmailMessage
 import joblib
 import mysql.connector
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, flash
@@ -12,11 +15,17 @@ DB_HOST = os.environ.get("DB_HOST", "localhost")
 DB_USER = os.environ.get("DB_USER", "root")
 DB_PASSWORD = os.environ.get("DB_PASSWORD", "Root@123")
 DB_NAME = os.environ.get("DB_NAME", "college_chatbot")
+SMTP_HOST = os.environ.get("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.environ.get("SMTP_PORT", "587"))
+SMTP_USER = os.environ.get("SMTP_USER", "")
+SMTP_PASS = os.environ.get("SMTP_PASS", "")
+SMTP_FROM = os.environ.get("SMTP_FROM", SMTP_USER)
 
 MODEL_DIR = "models"
 MODEL_PATH = os.path.join(MODEL_DIR, "intent_model.pkl")
 VECTORIZER_PATH = os.path.join(MODEL_DIR, "tfidf_vectorizer.pkl")
 ENCODER_PATH = os.path.join(MODEL_DIR, "label_encoder.pkl")
+MODEL_CACHE = {"model": None, "vectorizer": None, "encoder": None, "mtime": None}
 
 CONFIDENCE_THRESHOLD = 0.4
 SYLLABUS_STORE_PATH = os.path.join("data", "syllabus_store.json")
@@ -81,9 +90,23 @@ def ensure_admin_user():
 def load_model_bundle():
     if not (os.path.exists(MODEL_PATH) and os.path.exists(VECTORIZER_PATH) and os.path.exists(ENCODER_PATH)):
         return None, None, None
+    try:
+        mtimes = (
+            os.path.getmtime(MODEL_PATH),
+            os.path.getmtime(VECTORIZER_PATH),
+            os.path.getmtime(ENCODER_PATH),
+        )
+    except OSError:
+        return None, None, None
+    if MODEL_CACHE["mtime"] == mtimes:
+        return MODEL_CACHE["model"], MODEL_CACHE["vectorizer"], MODEL_CACHE["encoder"]
     model = joblib.load(MODEL_PATH)
     vectorizer = joblib.load(VECTORIZER_PATH)
     encoder = joblib.load(ENCODER_PATH)
+    MODEL_CACHE["model"] = model
+    MODEL_CACHE["vectorizer"] = vectorizer
+    MODEL_CACHE["encoder"] = encoder
+    MODEL_CACHE["mtime"] = mtimes
     return model, vectorizer, encoder
 
 
@@ -126,6 +149,196 @@ def log_chat(user_message, bot_response, intent=None, confidence=None):
         conn.close()
     except Exception:
         pass
+
+
+def fetch_student_by_roll(roll):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, name, roll, email, password_hash, is_verified, otp_code, otp_expires_at, verified_at "
+            "FROM students WHERE roll=%s",
+            (roll,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row
+    except Exception:
+        return None
+
+
+def fetch_student_by_email(email):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT id, name, roll, email, password_hash, is_verified, otp_code, otp_expires_at, verified_at "
+            "FROM students WHERE email=%s",
+            (email,)
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row
+    except Exception:
+        return None
+
+
+def create_student(name, roll, email, password_hash, otp_code, otp_expires_at):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "INSERT INTO students (name, roll, username, email, password_hash, otp_code, otp_expires_at, is_verified) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,0)",
+            (name, roll, roll, email, password_hash, otp_code, otp_expires_at)
+        )
+        cursor.close()
+        conn.close()
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+def update_student_pending_by_roll(name, roll, email, password_hash, otp_code, otp_expires_at):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE students SET name=%s, username=%s, email=%s, password_hash=%s, otp_code=%s, otp_expires_at=%s, is_verified=0 "
+            "WHERE roll=%s",
+            (name, roll, email, password_hash, otp_code, otp_expires_at, roll)
+        )
+        cursor.close()
+        conn.close()
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+def mark_student_verified(roll):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "UPDATE students SET is_verified=1, verified_at=%s, otp_code=NULL, otp_expires_at=NULL WHERE roll=%s",
+            (datetime.now(), roll)
+        )
+        cursor.close()
+        conn.close()
+        return True
+    except Exception:
+        return False
+
+
+def send_otp_email(to_email, name, otp_code):
+    if not (SMTP_USER and SMTP_PASS and SMTP_FROM):
+        return False, "SMTP is not configured. Please set SMTP_USER, SMTP_PASS, SMTP_FROM."
+    try:
+        msg = EmailMessage()
+        msg["Subject"] = "Your OTP for AI/ML Chatbot Registration"
+        msg["From"] = SMTP_FROM
+        msg["To"] = to_email
+        msg.set_content(
+            f"Hello {name},\n\n"
+            f"Your OTP for registration is: {otp_code}\n\n"
+            "This OTP is valid for 10 minutes.\n"
+            "If you did not request this, please ignore this email.\n\n"
+            "Regards,\nSVP AI/ML Chatbot"
+        )
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+            server.ehlo()
+            server.starttls()
+            server.login(SMTP_USER, SMTP_PASS)
+            server.send_message(msg)
+        return True, None
+    except Exception as e:
+        return False, str(e)
+
+
+def format_timestamp(ts):
+    if not ts:
+        ts = datetime.now()
+    if isinstance(ts, str):
+        try:
+            ts = datetime.fromisoformat(ts)
+        except Exception:
+            ts = datetime.now()
+    return ts.strftime("%d %b %Y, %I:%M %p")
+
+
+def fetch_intent_distribution(limit=5):
+    demo = [
+        {"label": "Admissions", "pct": 78},
+        {"label": "Courses", "pct": 64},
+        {"label": "Fees", "pct": 51},
+        {"label": "Placements", "pct": 46},
+        {"label": "Facilities", "pct": 39},
+    ]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            f"SELECT intent, COUNT(*) AS cnt FROM chat_logs "
+            f"WHERE intent IS NOT NULL GROUP BY intent ORDER BY cnt DESC LIMIT {int(limit)}"
+        )
+        rows = cursor.fetchall()
+        cursor.execute("SELECT MAX(created_at) FROM chat_logs")
+        last_updated = cursor.fetchone()[0]
+        cursor.close()
+        conn.close()
+        if not rows:
+            return demo, format_timestamp(last_updated)
+        total = sum(r[1] for r in rows) or 0
+        if total == 0:
+            return demo, format_timestamp(last_updated)
+        data = [{"label": r[0], "pct": round(r[1] * 100 / total)} for r in rows]
+        return data, format_timestamp(last_updated)
+    except Exception:
+        return demo, format_timestamp(None)
+
+
+def fetch_intent_trend(days=7):
+    demo = [
+        {"label": "Mon", "value": 12, "pct": 55},
+        {"label": "Tue", "value": 18, "pct": 75},
+        {"label": "Wed", "value": 9, "pct": 42},
+        {"label": "Thu", "value": 22, "pct": 90},
+        {"label": "Fri", "value": 15, "pct": 65},
+        {"label": "Sat", "value": 6, "pct": 28},
+        {"label": "Sun", "value": 10, "pct": 48},
+    ]
+    try:
+        days = int(days)
+        if days < 2:
+            days = 7
+        end_date = datetime.now().date()
+        start_date = end_date - timedelta(days=days - 1)
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT DATE(created_at) AS d, COUNT(*) AS cnt "
+            "FROM chat_logs WHERE intent IS NOT NULL AND created_at >= %s "
+            "GROUP BY d ORDER BY d",
+            (start_date,)
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        count_map = {r[0]: r[1] for r in rows}
+        series = []
+        max_count = max(count_map.values()) if count_map else 0
+        if max_count == 0:
+            return demo
+        for i in range(days):
+            d = start_date + timedelta(days=i)
+            cnt = int(count_map.get(d, 0))
+            pct = round(cnt * 100 / max_count) if max_count else 0
+            series.append({"label": d.strftime("%a"), "value": cnt, "pct": pct})
+        return series
+    except Exception:
+        return demo
 
 
 def load_syllabus_store():
@@ -445,7 +658,12 @@ def find_syllabus_response(message: str):
 
 @app.route("/")
 def index():
-    return render_template("index.html", college_name="SRI VENKATESHWARA POLYTECHNIC")
+    if session.get("student_roll") is None:
+        return redirect(url_for("student_login"))
+    return render_template(
+        "index.html",
+        college_name="SRI VENKATESHWARA POLYTECHNIC"
+    )
 
 
 @app.route("/api/chat", methods=["POST"])
@@ -502,6 +720,138 @@ def require_admin():
     return session.get("admin_id") is not None
 
 
+def require_student():
+    return session.get("student_roll") is not None
+
+
+@app.route("/student/login", methods=["GET", "POST"])
+def student_login():
+    if request.method == "POST":
+        roll = request.form.get("roll", "").strip()
+        password = request.form.get("password", "").strip()
+        if not (roll and password):
+            flash("Please enter your roll number and password", "error")
+            return render_template("student_login.html")
+        student = fetch_student_by_roll(roll)
+        if not student:
+            flash("Student not found. Please sign up first.", "error")
+            return redirect(url_for("student_signup"))
+        if not student[5]:
+            session["pending_roll"] = roll
+            flash("Please verify OTP to complete registration.", "error")
+            return redirect(url_for("student_verify"))
+        if not check_password_hash(student[4], password):
+            flash("Invalid credentials", "error")
+            return render_template("student_login.html")
+        session["student_name"] = student[1]
+        session["student_roll"] = student[2]
+        return redirect(url_for("index"))
+    return render_template("student_login.html")
+
+
+@app.route("/student/signup", methods=["GET", "POST"])
+def student_signup():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        roll = request.form.get("roll", "").strip()
+        email = request.form.get("email", "").strip()
+        password = request.form.get("password", "").strip()
+        if not (name and roll and email and password):
+            flash("All fields are required", "error")
+            return render_template("student_signup.html")
+
+        existing_roll = fetch_student_by_roll(roll)
+        existing_email = fetch_student_by_email(email)
+        if existing_roll and existing_roll[5]:
+            flash("Roll number already registered. Please login.", "error")
+            return redirect(url_for("student_login"))
+        if existing_email and existing_email[5]:
+            flash("Email already registered. Please login.", "error")
+            return redirect(url_for("student_login"))
+        if existing_email and existing_email[2] != roll:
+            flash("Email is already used with another roll number.", "error")
+            return render_template("student_signup.html")
+
+        otp_code = f"{random.randint(100000, 999999)}"
+        otp_expires_at = datetime.now() + timedelta(minutes=10)
+        password_hash = generate_password_hash(password)
+        if existing_roll and not existing_roll[5]:
+            created, err = update_student_pending_by_roll(name, roll, email, password_hash, otp_code, otp_expires_at)
+        else:
+            created, err = create_student(name, roll, email, password_hash, otp_code, otp_expires_at)
+        if not created:
+            flash(f"Signup failed: {err}", "error")
+            return render_template("student_signup.html")
+
+        session["pending_roll"] = roll
+        sent, err = send_otp_email(email, name, otp_code)
+        if not sent:
+            flash(f"OTP send failed: {err}", "error")
+            return render_template("student_signup.html")
+        flash(f"OTP sent to {email}. Please check your inbox.", "success")
+        return redirect(url_for("student_verify"))
+    return render_template("student_signup.html")
+
+
+@app.route("/student/verify", methods=["GET", "POST"])
+def student_verify():
+    pending_roll = session.get("pending_roll")
+    if request.method == "POST":
+        roll = request.form.get("roll", "").strip() or pending_roll
+        otp = request.form.get("otp", "").strip()
+        if not (roll and otp):
+            flash("Please enter roll number and OTP", "error")
+            return render_template("student_verify.html", roll=roll or "")
+        student = fetch_student_by_roll(roll)
+        if not student:
+            flash("Student not found. Please sign up.", "error")
+            return redirect(url_for("student_signup"))
+        if student[5]:
+            session["student_name"] = student[1]
+            session["student_roll"] = student[2]
+            session.pop("pending_roll", None)
+            return redirect(url_for("index"))
+        otp_code = student[6]
+        otp_expires_at = student[7]
+        if not otp_code or otp != otp_code:
+            flash("Invalid OTP", "error")
+            return render_template("student_verify.html", roll=roll)
+        if otp_expires_at and datetime.now() > otp_expires_at:
+            flash("OTP expired. Please sign up again to get a new OTP.", "error")
+            return redirect(url_for("student_signup"))
+        if not mark_student_verified(roll):
+            flash("Verification failed. Please try again.", "error")
+            return render_template("student_verify.html", roll=roll)
+        session["student_name"] = student[1]
+        session["student_roll"] = student[2]
+        session.pop("pending_roll", None)
+        return redirect(url_for("index"))
+    return render_template("student_verify.html", roll=pending_roll or "")
+
+
+@app.route("/student/profile")
+def student_profile():
+    if session.get("student_roll") is None:
+        return redirect(url_for("student_login"))
+    student = fetch_student_by_roll(session.get("student_roll"))
+    if not student:
+        return redirect(url_for("student_logout"))
+    profile = {
+        "name": student[1],
+        "roll": student[2],
+        "email": student[3],
+        "verified_at": format_timestamp(student[8]) if student[8] else "Not verified",
+    }
+    return render_template("student_profile.html", profile=profile)
+
+
+@app.route("/student/logout")
+def student_logout():
+    session.pop("student_name", None)
+    session.pop("student_roll", None)
+    return redirect(url_for("student_login"))
+
+
 @app.route("/admin")
 def admin_dashboard():
     if not require_admin():
@@ -509,6 +859,8 @@ def admin_dashboard():
 
     qa_rows = []
     intents = []
+    intent_dist, intent_last_updated = fetch_intent_distribution(limit=5)
+    intent_trend = fetch_intent_trend(days=7)
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -521,7 +873,14 @@ def admin_dashboard():
     except Exception:
         pass
 
-    return render_template("admin_dashboard.html", qa_rows=qa_rows, intents=intents)
+    return render_template(
+        "admin_dashboard.html",
+        qa_rows=qa_rows,
+        intents=intents,
+        intent_dist=intent_dist,
+        intent_last_updated=intent_last_updated,
+        intent_trend=intent_trend
+    )
 
 
 @app.route("/admin/add", methods=["POST"])

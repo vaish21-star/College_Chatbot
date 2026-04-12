@@ -18,6 +18,14 @@
       </div>
       <nav class="site-nav">
         <a href="/">Chat</a>
+        {% if session.get("student_roll") %}
+          <span class="nav-chip">Hi, {{ session.get("student_name") }}</span>
+          <a href="/student/profile">Profile</a>
+          <a href="/student/logout">Logout</a>
+        {% else %}
+          <a href="/student/login">Student Login</a>
+          <a href="/student/signup">Student Signup</a>
+        {% endif %}
         <a href="/admin">Admin</a>
       </nav>
     </header>

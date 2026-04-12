@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="admin-login">
+  <div class="form-card">
+    <h2>Verify OTP</h2>
+    <p class="muted">Enter the OTP sent to your email to complete registration.</p>
+    <form method="POST" action="/student/verify">
+      <label>Roll Number</label>
+      <input type="text" name="roll" value="{{ roll }}" required />
+      <label>OTP</label>
+      <input type="text" name="otp" required />
+      <button class="primary-btn" type="submit">Verify & Continue</button>
+    </form>
+    <div class="muted">Need a new OTP? <a href="/student/signup">Signup again</a></div>
+  </div>
+</section>
+{% endblock %}

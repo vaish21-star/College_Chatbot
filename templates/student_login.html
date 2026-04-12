@@ -1,0 +1,17 @@
+{% extends "layout.html" %}
+{% block content %}
+<section class="admin-login">
+  <div class="form-card">
+    <h2>Student Login</h2>
+    <p class="muted">Login with roll number and password to access the AI/ML chatbot.</p>
+    <form method="POST" action="/student/login">
+      <label>Roll Number</label>
+      <input type="text" name="roll" required />
+      <label>Password</label>
+      <input type="password" name="password" required />
+      <button class="primary-btn" type="submit">Login</button>
+    </form>
+    <div class="muted">New student? <a href="/student/signup">Create an account</a></div>
+  </div>
+</section>
+{% endblock %}
