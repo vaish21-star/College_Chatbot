@@ -1,17 +1,31 @@
 {% extends "layout.html" %}
+{% block body_class %}auth-body{% endblock %}
 {% block content %}
-<section class="admin-login">
-  <div class="form-card">
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-logo">SVP</div>
+    <h2>Complete your SVP registration</h2>
+    <p>Enter the OTP from your email to activate your student portal access.</p>
+    <div class="auth-art">
+      <div class="orb orb-lg"></div>
+      <div class="orb orb-md"></div>
+      <div class="orb orb-sm"></div>
+      <div class="plate"></div>
+      <div class="rod"></div>
+    </div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-top">OTP Verification</div>
     <h2>Verify OTP</h2>
-    <p class="muted">Enter the OTP sent to your email to complete registration.</p>
+    <p class="auth-sub">Keep this window open while you check your inbox.</p>
     <form method="POST" action="/student/verify">
       <label>Roll Number</label>
       <input type="text" name="roll" value="{{ roll }}" required />
       <label>OTP</label>
       <input type="text" name="otp" required />
-      <button class="primary-btn" type="submit">Verify & Continue</button>
+      <button class="primary-btn auth-btn" type="submit">Verify & Continue</button>
     </form>
-    <div class="muted">Need a new OTP? <a href="/student/signup">Signup again</a></div>
+    <div class="auth-foot">Need a new OTP? <a href="/student/signup">Signup again</a></div>
   </div>
 </section>
 {% endblock %}

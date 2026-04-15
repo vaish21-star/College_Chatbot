@@ -100,14 +100,21 @@ def load_model_bundle():
         return None, None, None
     if MODEL_CACHE["mtime"] == mtimes:
         return MODEL_CACHE["model"], MODEL_CACHE["vectorizer"], MODEL_CACHE["encoder"]
-    model = joblib.load(MODEL_PATH)
-    vectorizer = joblib.load(VECTORIZER_PATH)
-    encoder = joblib.load(ENCODER_PATH)
-    MODEL_CACHE["model"] = model
-    MODEL_CACHE["vectorizer"] = vectorizer
-    MODEL_CACHE["encoder"] = encoder
-    MODEL_CACHE["mtime"] = mtimes
-    return model, vectorizer, encoder
+    try:
+        model = joblib.load(MODEL_PATH)
+        vectorizer = joblib.load(VECTORIZER_PATH)
+        encoder = joblib.load(ENCODER_PATH)
+        MODEL_CACHE["model"] = model
+        MODEL_CACHE["vectorizer"] = vectorizer
+        MODEL_CACHE["encoder"] = encoder
+        MODEL_CACHE["mtime"] = mtimes
+        return model, vectorizer, encoder
+    except Exception:
+        MODEL_CACHE["model"] = None
+        MODEL_CACHE["vectorizer"] = None
+        MODEL_CACHE["encoder"] = None
+        MODEL_CACHE["mtime"] = None
+        return None, None, None
 
 
 def predict_intent(message: str):
@@ -135,6 +142,92 @@ def fetch_answer(intent: str):
     except Exception:
         return None
     return None
+
+
+def normalize_text(text: str):
+    normalized = re.sub(r"[^a-z0-9\s]", " ", (text or "").lower())
+    return re.sub(r"\s+", " ", normalized).strip()
+
+
+def fetch_answer_by_question(message: str):
+    target = normalize_text(message)
+    if not target:
+        return None, None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT question, answer, intent FROM qa_pairs")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+    except Exception:
+        return None, None
+
+    for question, answer, intent in rows:
+        if normalize_text(question) == target:
+            return answer, intent
+    return None, None
+
+
+def fallback_answer(intent: str):
+    defaults = {
+        "greeting": "Hi! I am SVP Assist. Ask me about admissions, courses, fees, timetable, placements, or college info.",
+        "college_info": (
+            "Sri Venkateshwara Polytechnic (SVP) offers diploma programs with a focus on practical skills, labs, and placements. "
+            "Ask me about admissions, courses, fees, timetable, or placements for more specific details."
+        ),
+        "admissions": "Admissions are open based on eligibility and application. Ask me about eligibility, documents, or deadlines.",
+        "courses": "We offer multiple diploma branches. Ask me about a specific branch or semester to get details.",
+        "fees": "Fees vary by branch and year. Ask about a specific branch or category for accurate fee details.",
+        "timetable": "Timetables are branch- and semester-specific. Tell me your branch and semester.",
+        "placements": "Placement support includes training, internships, and campus drives. Ask about recent companies or process.",
+    }
+    return defaults.get(intent)
+
+
+def detect_keyword_intent(message: str):
+    text = message.lower()
+    intent_keywords = {
+        "greeting": ["hi", "hello", "hey", "good morning", "good afternoon", "good evening"],
+        "admissions": ["admission", "apply", "eligibility", "entrance", "admissions"],
+        "courses": ["course", "courses", "branch", "branches", "department", "program", "programs", "diploma"],
+        "fees": ["fee", "fees", "tuition", "scholarship", "payment", "due"],
+        "timetable": ["timetable", "time table", "schedule", "class timing", "timings", "practical schedule"],
+        "placements": ["placement", "placements", "company", "companies", "internship", "training", "t&p"],
+        "college_info": [
+            "svp",
+            "sri venkateshwara",
+            "sri venkateswara",
+            "venkateshwara polytechnic",
+            "venkateswara polytechnic",
+            "polytechnic",
+            "college",
+            "campus",
+            "location",
+            "address",
+            "facilities",
+        ],
+    }
+
+    scores = {}
+    for intent, keywords in intent_keywords.items():
+        hits = 0
+        for kw in keywords:
+            if kw in text:
+                hits += 1
+        if hits:
+            scores[intent] = hits
+
+    if not scores:
+        return None
+
+    priority = ["greeting", "admissions", "courses", "fees", "timetable", "placements", "college_info"]
+    best_score = max(scores.values())
+    best_intents = [i for i, s in scores.items() if s == best_score]
+    for intent in priority:
+        if intent in best_intents:
+            return intent
+    return best_intents[0]
 
 
 def log_chat(user_message, bot_response, intent=None, confidence=None):
@@ -341,6 +434,110 @@ def fetch_intent_trend(days=7):
         return demo
 
 
+def fetch_confidence_distribution():
+    demo = [
+        {"label": "<40%", "pct": 12, "value": 14},
+        {"label": "40-60%", "pct": 22, "value": 26},
+        {"label": "60-80%", "pct": 38, "value": 44},
+        {"label": "80-100%", "pct": 28, "value": 32},
+    ]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT "
+            "SUM(CASE WHEN confidence < 0.4 THEN 1 ELSE 0 END) AS b1, "
+            "SUM(CASE WHEN confidence >= 0.4 AND confidence < 0.6 THEN 1 ELSE 0 END) AS b2, "
+            "SUM(CASE WHEN confidence >= 0.6 AND confidence < 0.8 THEN 1 ELSE 0 END) AS b3, "
+            "SUM(CASE WHEN confidence >= 0.8 THEN 1 ELSE 0 END) AS b4 "
+            "FROM chat_logs WHERE confidence IS NOT NULL"
+        )
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        if not row:
+            return demo
+        counts = [int(v or 0) for v in row]
+        total = sum(counts)
+        if total == 0:
+            return demo
+        labels = ["<40%", "40-60%", "60-80%", "80-100%"]
+        data = []
+        for label, cnt in zip(labels, counts):
+            pct = round(cnt * 100 / total)
+            data.append({"label": label, "pct": pct, "value": cnt})
+        return data
+    except Exception:
+        return demo
+
+
+def fetch_hourly_activity():
+    demo = [
+        {"label": "12-3", "pct": 20, "value": 8},
+        {"label": "4-7", "pct": 40, "value": 16},
+        {"label": "8-11", "pct": 65, "value": 26},
+        {"label": "12-3", "pct": 75, "value": 30},
+        {"label": "4-7", "pct": 55, "value": 22},
+        {"label": "8-11", "pct": 35, "value": 14},
+    ]
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT HOUR(created_at) AS h, COUNT(*) AS cnt FROM chat_logs GROUP BY h")
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        count_map = {int(r[0]): int(r[1]) for r in rows} if rows else {}
+        buckets = [
+            (0, 3, "12-3"),
+            (4, 7, "4-7"),
+            (8, 11, "8-11"),
+            (12, 15, "12-3"),
+            (16, 19, "4-7"),
+            (20, 23, "8-11"),
+        ]
+        values = []
+        for start, end, label in buckets:
+            total = 0
+            for h in range(start, end + 1):
+                total += count_map.get(h, 0)
+            values.append((label, total))
+        max_count = max((v for _, v in values), default=0)
+        if max_count == 0:
+            return demo
+        data = []
+        for label, cnt in values:
+            pct = round(cnt * 100 / max_count) if max_count else 0
+            data.append({"label": label, "pct": pct, "value": cnt})
+        return data
+    except Exception:
+        return demo
+
+
+def fetch_resolution_summary():
+    demo = {"total": 180, "resolved": 140, "unresolved": 40, "rate": 78}
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT COUNT(*) FROM chat_logs")
+        total = int(cursor.fetchone()[0] or 0)
+        cursor.execute(
+            "SELECT COUNT(*) FROM chat_logs "
+            "WHERE intent IS NOT NULL AND confidence IS NOT NULL AND confidence >= %s",
+            (CONFIDENCE_THRESHOLD,)
+        )
+        resolved = int(cursor.fetchone()[0] or 0)
+        cursor.close()
+        conn.close()
+        if total == 0:
+            return demo
+        unresolved = max(total - resolved, 0)
+        rate = round(resolved * 100 / total) if total else 0
+        return {"total": total, "resolved": resolved, "unresolved": unresolved, "rate": rate}
+    except Exception:
+        return demo
+
+
 def load_syllabus_store():
     global SYLLABUS_CACHE, SYLLABUS_MTIME
     try:
@@ -431,25 +628,96 @@ def extract_sem_section(text: str, sem_number: int):
     if not target_roman:
         return text
     upper = text.upper()
-    patterns = [
-        rf"\b{target_roman}\s*SEM",
-        rf"\b{sem_number}(?:ST|ND|RD|TH)?\s*SEM",
-        rf"\bSEMESTER\s*{sem_number}\b",
-    ]
-    positions = []
-    for idx, m in enumerate(re.finditer(r"\b(I{1,3}|IV|V|VI)\s*SEM\b|\b[1-6](?:ST|ND|RD|TH)?\s*SEM\b|\bSEMESTER\s*[1-6]\b", upper)):
-        positions.append((m.start(), m.group(0)))
 
+    # If the syllabus is organized as per-course blocks, extract only the blocks
+    # that mention the requested semester.
+    if re.search(r"Course Title", text, re.IGNORECASE):
+        sem_markers = [
+            rf"\bSEMESTER\s*{target_roman}\b",
+            rf"\bSEMESTER\s*{sem_number}\b",
+            rf"\b{target_roman}\s*SEM\b",
+            rf"\b{sem_number}(?:ST|ND|RD|TH)?\s*SEM\b",
+        ]
+        pair_map = {1: (1, 2), 2: (1, 2), 3: (3, 4), 4: (3, 4), 5: (5, 6), 6: (5, 6)}
+        pair = pair_map.get(sem_number)
+        if pair:
+            r1 = roman_map.get(pair[0])
+            r2 = roman_map.get(pair[1])
+            if r1 and r2:
+                sem_markers.append(rf"\bSEMESTER\s*{r1}\s*/\s*{r2}\b")
+            sem_markers.append(rf"\bSEMESTER\s*{pair[0]}\s*/\s*{pair[1]}\b")
+        blocks = []
+        for m in re.finditer(r"Course Title", text, re.IGNORECASE):
+            start = max(0, m.start() - 200)
+            end = min(len(text), m.start() + 1200)
+            window = text[start:end]
+            if any(re.search(pat, window, re.IGNORECASE) for pat in sem_markers):
+                blocks.append(text[start:end].strip())
+        if blocks:
+            return "\n\n".join(blocks)
+
+    # Capture headings like "SEMESTER I", "SEMESTER 1", "I SEM", "1ST SEM",
+    # and combined ones like "SEMESTER I/II".
+    heading_pattern = re.compile(
+        r"\bSEMESTER\s*(I{1,3}|IV|V|VI|[1-6])(?:\s*/\s*(I{1,3}|IV|V|VI|[1-6]))?\b"
+        r"|\b(I{1,3}|IV|V|VI)\s*SEM\b"
+        r"|\b[1-6](?:ST|ND|RD|TH)?\s*SEM\b",
+        re.IGNORECASE,
+    )
+
+    def roman_to_int(token: str):
+        if not token:
+            return None
+        token = token.upper()
+        return {"I": 1, "II": 2, "III": 3, "IV": 4, "V": 5, "VI": 6}.get(token)
+
+    headings = []
+    for m in heading_pattern.finditer(text):
+        raw = m.group(0)
+        # Skip summary headers like "Semester I II III IV V VI".
+        line_start = text.rfind("\n", 0, m.start()) + 1
+        line_end = text.find("\n", m.start())
+        if line_end == -1:
+            line_end = len(text)
+        line = text[line_start:line_end].upper()
+        if re.search(r"SEMESTER\s+I\s+II\s+III", line) or re.search(r"SEMESTER\s+1\s+2\s+3", line):
+            continue
+        sems = []
+        if m.group(1):
+            sems.append(roman_to_int(m.group(1)) if not m.group(1).isdigit() else int(m.group(1)))
+        if m.group(2):
+            sems.append(roman_to_int(m.group(2)) if not m.group(2).isdigit() else int(m.group(2)))
+        if m.group(3):
+            sems.append(roman_to_int(m.group(3)))
+        if not sems:
+            # Numeric SEM match (e.g., "1ST SEM")
+            num_match = re.search(r"\b([1-6])\b", raw)
+            if num_match:
+                sems.append(int(num_match.group(1)))
+        sems = [s for s in sems if s]
+        if not sems:
+            continue
+        headings.append((m.start(), raw, sems))
+
+    if not headings:
+        return text
+
+    # Prefer a single-semester heading; fall back to combined.
     start = None
-    for pos, label in positions:
-        if re.search(patterns[0], label) or re.search(patterns[1], label) or re.search(patterns[2], label):
+    for pos, raw, sems in headings:
+        if sem_number in sems and len(sems) == 1:
             start = pos
             break
+    if start is None:
+        for pos, raw, sems in headings:
+            if sem_number in sems:
+                start = pos
+                break
     if start is None:
         return text
 
     end = len(text)
-    for pos, _ in positions:
+    for pos, _, _ in headings:
         if pos > start:
             end = pos
             break
@@ -461,6 +729,8 @@ def count_subject_lines(text: str):
     subject_lines = []
     pattern = re.compile(r"^[A-Z]{1,4}\s*[-]?\s*\d{2,4}[A-Z]?\s*[-:]\s+.+")
     for ln in lines:
+        if re.match(r"^(ISBN|ISSN)\b", ln, re.IGNORECASE):
+            continue
         if pattern.match(ln):
             subject_lines.append(ln)
     seen = set()
@@ -480,6 +750,8 @@ def extract_subject_names(text: str):
         m = pattern.match(ln)
         if m:
             name = m.group(1).strip()
+            if not re.search(r"[A-Za-z]", name):
+                continue
             names.append(name)
     return names
 
@@ -509,6 +781,16 @@ def extract_course_titles(text: str, sem_number=None):
                 sem_ok = True
             if re.search(rf"\b{sem_number}(?:ST|ND|RD|TH)?\s*SEM", window, re.IGNORECASE):
                 sem_ok = True
+            # Treat combined semesters like "Semester I/II" as a match for both.
+            pair_map = {1: (1, 2), 2: (1, 2), 3: (3, 4), 4: (3, 4), 5: (5, 6), 6: (5, 6)}
+            pair = pair_map.get(sem_number)
+            if pair:
+                r1 = roman_map.get(pair[0])
+                r2 = roman_map.get(pair[1])
+                if r1 and r2 and re.search(rf"Semester\s*{r1}\s*/\s*{r2}\b", window, re.IGNORECASE):
+                    sem_ok = True
+                if re.search(rf"Semester\s*{pair[0]}\s*/\s*{pair[1]}\b", window, re.IGNORECASE):
+                    sem_ok = True
         if sem_ok:
             titles.append(raw)
     # De-dup while preserving order
@@ -635,14 +917,15 @@ def find_syllabus_response(message: str):
         if not names:
             names = extract_course_titles(section, sem_number)
         if names:
-            return f"{source}\n\nSubject names:\n" + "\n".join(names)
+            bullets = "\n".join(f"- {name}" for name in names)
+            return f"{source}\n\nSubject names:\n{bullets}"
 
     if wants_count:
         if not subject_lines:
             subject_lines = extract_course_titles(section, sem_number)
         if subject_lines:
             count = len(subject_lines)
-            sample = "\n".join(subject_lines[:8])
+            sample = "\n".join(f"- {line}" for line in subject_lines[:8])
             return f"{source}\n\nTotal subjects found for this semester: {count}\n\nSample subjects:\n{sample}"
 
     snippets = extract_relevant_snippets(section, message)
@@ -678,13 +961,29 @@ def chat_api():
         log_chat(message, syllabus_reply, intent="syllabus", confidence=1.0)
         return jsonify({"reply": syllabus_reply, "intent": "syllabus", "confidence": 1.0})
 
+    direct_answer, direct_intent = fetch_answer_by_question(message)
+    if direct_answer:
+        log_chat(message, direct_answer, intent=direct_intent, confidence=1.0)
+        return jsonify({"reply": direct_answer, "intent": direct_intent, "confidence": 1.0})
+
+    keyword_intent = detect_keyword_intent(message)
+    if keyword_intent:
+        keyword_answer = fetch_answer(keyword_intent)
+        if keyword_answer:
+            log_chat(message, keyword_answer, intent=keyword_intent, confidence=1.0)
+            return jsonify({"reply": keyword_answer, "intent": keyword_intent, "confidence": 1.0})
+        fallback = fallback_answer(keyword_intent)
+        if fallback:
+            log_chat(message, fallback, intent=keyword_intent, confidence=1.0)
+            return jsonify({"reply": fallback, "intent": keyword_intent, "confidence": 1.0})
+
     intent, confidence = predict_intent(message)
     if intent is None or confidence < CONFIDENCE_THRESHOLD:
         reply = "I am not fully sure. Could you please rephrase or ask about admissions, courses, fees, timetable, placements, or college info?"
         log_chat(message, reply, intent, confidence)
         return jsonify({"reply": reply, "intent": intent, "confidence": confidence})
 
-    answer = fetch_answer(intent) or "I have information about this, but the detailed answer is not available in the database yet."
+    answer = fetch_answer(intent) or fallback_answer(intent) or "I have information about this, but the detailed answer is not available in the database yet."
     log_chat(message, answer, intent, confidence)
     return jsonify({"reply": answer, "intent": intent, "confidence": confidence})
 
@@ -829,6 +1128,19 @@ def student_verify():
     return render_template("student_verify.html", roll=pending_roll or "")
 
 
+@app.route("/student/forgot", methods=["GET", "POST"])
+def student_forgot():
+    if request.method == "POST":
+        roll = request.form.get("roll", "").strip()
+        email = request.form.get("email", "").strip()
+        if not (roll or email):
+            flash("Please provide your roll number or email", "error")
+            return render_template("student_forgot.html")
+        flash("Reset request received. Please contact the admin office to complete the reset.", "success")
+        return redirect(url_for("student_login"))
+    return render_template("student_forgot.html")
+
+
 @app.route("/student/profile")
 def student_profile():
     if session.get("student_roll") is None:
@@ -861,6 +1173,9 @@ def admin_dashboard():
     intents = []
     intent_dist, intent_last_updated = fetch_intent_distribution(limit=5)
     intent_trend = fetch_intent_trend(days=7)
+    confidence_dist = fetch_confidence_distribution()
+    hourly_activity = fetch_hourly_activity()
+    resolution_summary = fetch_resolution_summary()
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
@@ -879,7 +1194,10 @@ def admin_dashboard():
         intents=intents,
         intent_dist=intent_dist,
         intent_last_updated=intent_last_updated,
-        intent_trend=intent_trend
+        intent_trend=intent_trend,
+        confidence_dist=confidence_dist,
+        hourly_activity=hourly_activity,
+        resolution_summary=resolution_summary
     )
 
 
@@ -913,6 +1231,19 @@ def admin_add():
     return redirect(url_for("admin_dashboard"))
 
 
+def fetch_qa_by_id(qa_id):
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, question, answer, intent FROM qa_pairs WHERE id=%s", (qa_id,))
+        row = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return row
+    except Exception:
+        return None
+
+
 @app.route("/admin/train", methods=["POST"])
 def admin_train():
     if not require_admin():
@@ -941,6 +1272,68 @@ def admin_train():
     except Exception as e:
         flash(f"Training failed: {e}", "error")
 
+    return redirect(url_for("admin_dashboard"))
+
+
+@app.route("/admin/edit/<int:qa_id>", methods=["GET", "POST"])
+def admin_edit(qa_id):
+    if not require_admin():
+        return redirect(url_for("admin_login"))
+
+    qa_row = fetch_qa_by_id(qa_id)
+    if not qa_row:
+        flash("Q&A not found", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    intents = []
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT intent FROM intents ORDER BY intent")
+        intents = [r[0] for r in cursor.fetchall()]
+        cursor.close()
+        conn.close()
+    except Exception:
+        pass
+
+    if request.method == "POST":
+        question = request.form.get("question", "").strip()
+        answer = request.form.get("answer", "").strip()
+        intent = request.form.get("intent", "").strip()
+        if not (question and answer and intent):
+            flash("All fields are required", "error")
+            return render_template("admin_edit_qa.html", qa_row=qa_row, intents=intents)
+        try:
+            conn = get_db_connection()
+            cursor = conn.cursor()
+            cursor.execute("INSERT IGNORE INTO intents (intent) VALUES (%s)", (intent,))
+            cursor.execute(
+                "UPDATE qa_pairs SET question=%s, answer=%s, intent=%s WHERE id=%s",
+                (question, answer, intent, qa_id)
+            )
+            cursor.close()
+            conn.close()
+            flash("Q&A updated successfully", "success")
+            return redirect(url_for("admin_dashboard"))
+        except Exception:
+            flash("Failed to update Q&A", "error")
+
+    return render_template("admin_edit_qa.html", qa_row=qa_row, intents=intents)
+
+
+@app.route("/admin/delete/<int:qa_id>", methods=["POST"])
+def admin_delete(qa_id):
+    if not require_admin():
+        return redirect(url_for("admin_login"))
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM qa_pairs WHERE id=%s", (qa_id,))
+        cursor.close()
+        conn.close()
+        flash("Q&A deleted successfully", "success")
+    except Exception:
+        flash("Failed to delete Q&A", "error")
     return redirect(url_for("admin_dashboard"))
 
 

@@ -1,14 +1,32 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
+{% block body_class %}auth-body{% endblock %}
 {% block content %}
-<section class="admin-login">
-  <h2>Admin Login</h2>
-  <form method="POST" class="form-card">
-    <label>Username</label>
-    <input type="text" name="username" required />
-    <label>Password</label>
-    <input type="password" name="password" required />
-    <button type="submit" class="primary-btn">Login</button>
-  </form>
-  <p class="muted">Default admin: admin / admin123 (change after first login)</p>
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-logo">SVP</div>
+    <h2>SVP College Admin Console</h2>
+    <p>Manage Q&A, review student data, and monitor chatbot performance.</p>
+    <div class="auth-art">
+      <div class="orb orb-lg"></div>
+      <div class="orb orb-md"></div>
+      <div class="orb orb-sm"></div>
+      <div class="plate"></div>
+      <div class="rod"></div>
+    </div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-top">Admin Console</div>
+    <h2>Admin Login</h2>
+    <p class="auth-sub">Sign in with your admin credentials.</p>
+    <form method="POST" class="form-card">
+      <label>Username</label>
+      <input type="text" name="username" required />
+      <label>Password</label>
+      <input type="password" name="password" required />
+      <button type="submit" class="primary-btn auth-btn">Login</button>
+    </form>
+    <p class="auth-foot">Default admin: <strong>admin / admin123</strong> (change after first login).</p>
+    <p class="auth-foot">Student? <a href="/student/login">Go to Student Login</a></p>
+  </div>
 </section>
 {% endblock %}

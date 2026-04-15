@@ -1,0 +1,35 @@
+{% extends "layout.html" %}
+{% block body_class %}auth-body{% endblock %}
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-logo">SVP</div>
+    <h2>Refine SVP knowledge base</h2>
+    <p>Keep chatbot answers accurate and aligned with campus updates.</p>
+    <div class="auth-art">
+      <div class="orb orb-lg"></div>
+      <div class="orb orb-md"></div>
+      <div class="orb orb-sm"></div>
+      <div class="plate"></div>
+      <div class="rod"></div>
+    </div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-top"><a class="auth-link" href="/admin">Back to Dashboard</a></div>
+    <h2>Edit Q&amp;A</h2>
+    <p class="auth-sub">Update the prompt and response pair below.</p>
+    <form method="POST" action="/admin/edit/{{ qa_row[0] }}">
+      <label>Question</label>
+      <input type="text" name="question" value="{{ qa_row[1] }}" required />
+      <label>Answer</label>
+      <textarea name="answer" rows="4" required>{{ qa_row[2] }}</textarea>
+      <label>Intent</label>
+      <input list="intent-list" name="intent" value="{{ qa_row[3] }}" required />
+      <datalist id="intent-list">
+        {% for i in intents %}<option value="{{ i }}"></option>{% endfor %}
+      </datalist>
+      <button class="primary-btn auth-btn" type="submit">Save Changes</button>
+    </form>
+  </div>
+</section>
+{% endblock %}

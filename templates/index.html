@@ -1,41 +1,56 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
+{% block body_class %}home-body{% endblock %}
 {% block content %}
-<section class="hero">
-  <div class="hero-text">
-    <h1>Ask Anything About {{ college_name }}</h1>
-    <p>Admissions, courses, fees, timetable, placements, facilities and more. Powered by AI/ML intent classification.</p>
-    <div class="hero-tags">
-      <span>TF-IDF</span>
-      <span>NLP Pipeline</span>
-      <span>Scikit-learn</span>
-      <span>MySQL</span>
-    </div>
-  </div>
-  <div class="hero-panel">
-    <div class="bot-card">
-      <div class="bot-avatar">AI</div>
-      <div>
-        <div class="bot-name">SVP Assist</div>
-        <div class="bot-desc">Intelligent college info assistant</div>
+<section class="home-shell">
+  <div class="home-card">
+    <div class="home-visual">
+      <div class="home-badge">SVP Assist</div>
+      <h1>Ask Anything About {{ college_name }}</h1>
+      <p>Admissions, courses, fees, timetable, placements, facilities and more. Powered by AI/ML intent classification.</p>
+      <div class="home-tags">
+        <span>TF-IDF</span>
+        <span>NLP Pipeline</span>
+        <span>Scikit-learn</span>
+        <span>MySQL</span>
+      </div>
+      <div class="home-highlights">
+        <div class="highlight-card">
+          <h3>Smart Responses</h3>
+          <p>Trained on verified college data with fast intent mapping.</p>
+        </div>
+        <div class="highlight-card">
+          <h3>Voice Enabled</h3>
+          <p>Ask questions by voice and get instant replies.</p>
+        </div>
+      </div>
+      <div class="home-art">
+        <div class="orb orb-lg"></div>
+        <div class="orb orb-md"></div>
+        <div class="orb orb-sm"></div>
+        <div class="plate"></div>
+        <div class="rod"></div>
       </div>
     </div>
-    <ul class="bot-list">
-      <li>Intent classification with Logistic Regression</li>
-      <li>Smart responses from MySQL knowledge base</li>
-      <li>Voice input enabled (optional)</li>
-    </ul>
-  </div>
-</section>
 
-<section class="chat-shell">
-  <div class="chat-window" id="chatWindow"></div>
+    <div class="home-chat">
+      <div class="chat-head">
+        <div>
+          <div class="chat-title">Chat with SVP Assist</div>
+          <div class="chat-sub">Ask about admissions, fees, or placements.</div>
+        </div>
+        <span class="chat-pill">Live</span>
+      </div>
 
-  <div class="chat-controls">
-    <button class="voice-btn" id="voiceBtn" type="button">Start Voice</button>
-    <input class="chat-input" id="chatInput" type="text" placeholder="Type your question..." />
-    <button class="send-btn" id="sendBtn" type="button">Send</button>
+      <div class="chat-window" id="chatWindow"></div>
+
+      <div class="chat-controls">
+        <button class="voice-btn" id="voiceBtn" type="button">Start Voice</button>
+        <input class="chat-input" id="chatInput" type="text" placeholder="Type your question..." />
+        <button class="send-btn" id="sendBtn" type="button">Send</button>
+      </div>
+      <div class="chat-hint">Try: "What courses are offered?" or "Tell me about placements"</div>
+    </div>
   </div>
-  <div class="chat-hint">Try: "What courses are offered?" or "Tell me about placements"</div>
 </section>
 {% endblock %}
 

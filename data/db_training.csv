@@ -2,3 +2,10 @@ question,intent
 ABOUT OUR COLLEGE,"SVP, COLLEGE,SRI VENKATESHWARA POLYTECHNIC"
 hi,"hi,hello,bro"
 What are subjects in CS 1st semester?,"cse,sem1,1st sem subjects"
+What courses are available?,courses_available
+List subject names for C20 DAE 1-2 semesters.,subjects_c20_dae_1_2
+List subject names for C20 CSE 1-2 semesters.,subjects_c20_cse_1_2
+List subject names for C20 ECE 1-2 semesters.,subjects_c20_ece_1_2
+List subject names for C20 DME 1-2 semesters.,subjects_c20_dme_1_2
+Is 14th april is college holiday?,14 april_ ambedkar jayanthi
+HEAD OF CSE DEPARTMENT,"CSE HOD, CS HOD"

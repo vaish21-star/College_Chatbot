@@ -1,17 +1,33 @@
 {% extends "layout.html" %}
+{% block body_class %}auth-body{% endblock %}
 {% block content %}
-<section class="admin-login">
-  <div class="form-card">
-    <h2>Student Login</h2>
-    <p class="muted">Login with roll number and password to access the AI/ML chatbot.</p>
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-logo">SVP</div>
+    <h2>Welcome back to SVP College Portal</h2>
+    <p>Access campus updates, syllabus Q&A, and student support in one place.</p>
+    <div class="auth-art">
+      <div class="orb orb-lg"></div>
+      <div class="orb orb-md"></div>
+      <div class="orb orb-sm"></div>
+      <div class="plate"></div>
+      <div class="rod"></div>
+    </div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-top">English (UK)</div>
+    <h2>Sign In</h2>
+    <p class="auth-sub">Use your roll number and password to continue.</p>
     <form method="POST" action="/student/login">
       <label>Roll Number</label>
       <input type="text" name="roll" required />
       <label>Password</label>
       <input type="password" name="password" required />
-      <button class="primary-btn" type="submit">Login</button>
+      <div class="auth-foot"><a href="/student/forgot">Forgot password?</a></div>
+      <button class="primary-btn auth-btn" type="submit">Login</button>
     </form>
-    <div class="muted">New student? <a href="/student/signup">Create an account</a></div>
+    <div class="auth-foot">New student? <a href="/student/signup">Create an account</a></div>
+    <div class="auth-foot">Admin? <a href="/admin">Go to Admin Login</a></div>
   </div>
 </section>
 {% endblock %}

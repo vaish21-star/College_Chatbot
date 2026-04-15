@@ -1,7 +1,21 @@
 {% extends "layout.html" %}
+{% block body_class %}auth-body{% endblock %}
 {% block content %}
-<section class="admin-login">
-  <div class="form-card">
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-logo">SVP</div>
+    <h2>Your SVP student profile</h2>
+    <p>Review your registration details, contact info, and verification status.</p>
+    <div class="auth-art">
+      <div class="orb orb-lg"></div>
+      <div class="orb orb-md"></div>
+      <div class="orb orb-sm"></div>
+      <div class="plate"></div>
+      <div class="rod"></div>
+    </div>
+  </div>
+  <div class="auth-form auth-profile">
+    <div class="auth-top">Profile Overview</div>
     <h2>Student Profile</h2>
     <div class="profile-row">
       <span class="profile-label">Name</span>
@@ -19,6 +33,7 @@
       <span class="profile-label">Verified At</span>
       <span class="profile-value">{{ profile.verified_at }}</span>
     </div>
+    <div class="auth-foot">Need updates? Contact the admin office.</div>
   </div>
 </section>
 {% endblock %}

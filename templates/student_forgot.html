@@ -1,0 +1,31 @@
+{% extends "layout.html" %}
+{% block body_class %}auth-body{% endblock %}
+{% block content %}
+<section class="auth-shell">
+  <div class="auth-visual">
+    <div class="auth-logo">SVP</div>
+    <h2>Reset your SVP account</h2>
+    <p>Submit your roll number or email and we will guide you through recovery.</p>
+    <div class="auth-art">
+      <div class="orb orb-lg"></div>
+      <div class="orb orb-md"></div>
+      <div class="orb orb-sm"></div>
+      <div class="plate"></div>
+      <div class="rod"></div>
+    </div>
+  </div>
+  <div class="auth-form">
+    <div class="auth-top">Password Recovery</div>
+    <h2>Forgot Password</h2>
+    <p class="auth-sub">Provide your roll number or email to begin.</p>
+    <form method="POST" action="/student/forgot">
+      <label>Roll Number</label>
+      <input type="text" name="roll" />
+      <label>Email Address</label>
+      <input type="email" name="email" />
+      <button class="primary-btn auth-btn" type="submit">Submit Request</button>
+    </form>
+    <div class="auth-foot">Remembered? <a href="/student/login">Back to login</a></div>
+  </div>
+</section>
+{% endblock %}

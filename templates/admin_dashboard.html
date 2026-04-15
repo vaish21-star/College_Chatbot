@@ -1,8 +1,10 @@
-﻿{% extends "layout.html" %}
+{% extends "layout.html" %}
+{% block body_class %}admin-body{% endblock %}
 {% block content %}
 <section class="admin-header">
   <h2>Admin Dashboard</h2>
   <div class="admin-actions">
+    <a class="secondary-btn" href="/student/login">Switch to Student Login</a>
     <form method="POST" action="/admin/train">
       <button class="secondary-btn" type="submit">Retrain Model</button>
     </form>
@@ -45,9 +47,66 @@
   </div>
 </section>
 
+<section class="quality-section">
+  <div class="section-head">
+    <h2>Quality Snapshot</h2>
+    <p>Confidence mix, resolution rate, and peak activity windows.</p>
+  </div>
+  <div class="quality-grid">
+    <div class="quality-card">
+      <h3>Resolution Rate</h3>
+      <div class="ring" style="--ring: {{ resolution_summary.rate * 3.6 }}deg">
+        <div class="ring-inner">
+          <div class="ring-value">{{ resolution_summary.rate }}%</div>
+          <div class="ring-label">Resolved</div>
+        </div>
+      </div>
+      <div class="quality-stats">
+        <div>
+          <div class="quality-label">Total chats</div>
+          <div class="quality-value">{{ resolution_summary.total }}</div>
+        </div>
+        <div>
+          <div class="quality-label">Resolved</div>
+          <div class="quality-value">{{ resolution_summary.resolved }}</div>
+        </div>
+        <div>
+          <div class="quality-label">Unresolved</div>
+          <div class="quality-value">{{ resolution_summary.unresolved }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="quality-card">
+      <h3>Confidence Distribution</h3>
+      <div class="confidence-list">
+        {% for item in confidence_dist %}
+        <div class="confidence-row">
+          <div class="confidence-label">{{ item.label }}</div>
+          <div class="confidence-bar"><span style="width: {{ item.pct }}%"></span></div>
+          <div class="confidence-value">{{ item.value }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="quality-card">
+      <h3>Peak Activity (Time Blocks)</h3>
+      <div class="heatmap">
+        {% for item in hourly_activity %}
+        <div class="heat-cell" style="--heat: {{ item.pct / 100 }}">
+          <div class="heat-label">{{ item.label }}</div>
+          <div class="heat-value">{{ item.value }}</div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</section>
+
 <section class="admin-grid">
   <div class="form-card">
-    <h3>Add New Q&A</h3>
+    <h3>Add New Q&amp;A</h3>
     <form method="POST" action="/admin/add">
       <label>Question</label>
       <input type="text" name="question" required />
@@ -72,6 +131,7 @@
             <th>Question</th>
             <th>Answer</th>
             <th>Intent</th>
+            <th>Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -81,6 +141,14 @@
               <td>{{ row[1] }}</td>
               <td>{{ row[2] }}</td>
               <td>{{ row[3] }}</td>
+              <td>
+                <div class="table-actions">
+                  <a class="secondary-btn mini-btn" href="/admin/edit/{{ row[0] }}">Edit</a>
+                  <form method="POST" action="/admin/delete/{{ row[0] }}" onsubmit="return confirm('Delete this Q&amp;A?');">
+                    <button class="danger-btn mini-btn" type="submit">Delete</button>
+                  </form>
+                </div>
+              </td>
             </tr>
           {% endfor %}
         </tbody>
